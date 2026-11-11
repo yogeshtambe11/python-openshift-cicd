@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: clone-source
+spec:
+  params:
+    - name: repo-url
+      type: string
+    - name: revision
+      type: string
+      default: main
+  workspaces:
+    - name: source
+  results:
+    - name: commit
+      description: Full Git commit SHA cloned for this run
+  steps:
+    - name: clone
+      image: alpine/git:2.45.2
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -eu
+        git clone --depth 1 --branch "$(params.revision)" \
+          "$(params.repo-url)" "$(workspaces.source.path)"
+        cd "$(workspaces.source.path)"
+        git rev-parse HEAD | tee "$(results.commit.path)"
+

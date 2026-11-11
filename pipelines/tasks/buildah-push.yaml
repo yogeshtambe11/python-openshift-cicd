@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah-push
+spec:
+  params:
+    - name: image
+      type: string
+    - name: tag
+      type: string
+  workspaces:
+    - name: source
+  steps:
+    - name: build-and-push
+      image: quay.io/buildah/stable:v1.39.3
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        privileged: true
+      script: |
+        #!/bin/sh
+        set -eu
+        IMAGE="$(params.image)"
+        TAG="$(params.tag)"
+        echo "Building ${IMAGE}:${TAG}"
+        buildah bud --storage-driver=vfs --format docker \
+          -t "${IMAGE}:${TAG}" .
+        buildah push --tls-verify=false \
+          "${IMAGE}:${TAG}" "docker://${IMAGE}:${TAG}"

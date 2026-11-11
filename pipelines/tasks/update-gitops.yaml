@@ -1,0 +1,66 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: update-gitops
+spec:
+  params:
+    - name: repo-url
+      type: string
+    - name: branch
+      type: string
+      default: main
+    - name: image
+      type: string
+    - name: tag
+      type: string
+  steps:
+    - name: update-and-push
+      image: alpine/git:2.45.2
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
+      script: |
+        #!/bin/sh
+        set -eu
+
+        REPO_URL="$(params.repo-url)"
+        BRANCH="$(params.branch)"
+        IMAGE="$(params.image)"
+        TAG="$(params.tag)"
+
+        mkdir -p /tmp/gitops-work
+        git clone --depth 1 --branch "${BRANCH}" \
+          "${REPO_URL}" /tmp/gitops-work
+        cd /tmp/gitops-work
+
+        # Replace the application's image line with the immutable commit tag.
+        sed -i "s|^[[:space:]]*image:.*|          image: ${IMAGE}:${TAG}|" \
+          gitops/deployment.yaml
+
+        if git diff --quiet; then
+          echo "GitOps image is already at ${IMAGE}:${TAG}; nothing to commit."
+          exit 0
+        fi
+
+        git config user.name "tekton-ci"
+        git config user.email "tekton-ci@example.invalid"
+        git add gitops/deployment.yaml
+        git commit -m "Deploy image ${TAG}"
+
+        # Use askpass so the token is not embedded in the remote URL.
+        cat > /tmp/git-askpass.sh <<'EOF'
+        #!/bin/sh
+        case "$1" in
+          *Username*) printf '%s\n' "x-access-token" ;;
+          *Password*) printf '%s\n' "$GITHUB_TOKEN" ;;
+          *) exit 1 ;;
+        esac
+        EOF
+        chmod 700 /tmp/git-askpass.sh
+
+        GIT_ASKPASS=/tmp/git-askpass.sh \
+        GIT_TERMINAL_PROMPT=0 \
+          git push "${REPO_URL}" "HEAD:refs/heads/${BRANCH}"

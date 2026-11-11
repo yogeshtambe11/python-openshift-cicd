@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: python-cicd
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/yogeshtambe11/python-openshift-cicd.git
+    targetRevision: main
+    path: gitops
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: python-cicd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

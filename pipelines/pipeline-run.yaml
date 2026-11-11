@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: python-cicd-run-
+spec:
+  pipelineRef:
+    name: python-cicd
+  taskRunTemplate:
+    serviceAccountName: cicd-pipeline
+  params:
+    - name: repo-url
+      value: https://github.com/yogeshtambe11/python-openshift-cicd.git
+    - name: revision
+      value: main
+    - name: image
+      value: image-registry.openshift-image-registry.svc:5000/python-cicd/python-app
+  workspaces:
+    - name: shared-source
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
